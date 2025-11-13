@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 // === CONFIGURACIÓN ===
-const HF_TOKEN = process.env.HF_TOKEN || "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";
+const HF_TOKEN = process.env.HF_TOKEN;
 const MODEL = "intfloat/multilingual-e5-large";
 
 // === RUTA PRINCIPAL ===
@@ -43,8 +43,9 @@ app.post("/embed", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("✅ RAG Service activo");
+  res.send("RAG Service activo");
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor RAG corriendo en puerto ${PORT}`));
+
