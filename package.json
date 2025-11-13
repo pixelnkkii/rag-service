@@ -1,15 +1,14 @@
 {
   "name": "rag-embedding-service",
   "version": "1.0.0",
-  "description": "Servicio Node.js para generar embeddings con Hugging Face",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "@huggingface/inference": "^2.6.1",
-    "express": "^4.18.2",
-    "node-fetch": "^3.3.2"
+    "express": "^4.19.0",
+    "node-fetch": "^3.3.2",
+    "cors": "^2.8.5"
   }
 }
