@@ -1,74 +1,56 @@
-
-
-
-
 import express from "express";
 import fetch from "node-fetch";
+import cors from "cors";
 
 const app = express();
-app.use(express.json());
+app.use(cors());
 
-// === CONFIGURACIÓN ===
+// *** ESTA LÍNEA ES LO QUE FALTABA ***
+app.use(express.json({ limit: "10mb" }));
+
 const HF_TOKEN = process.env.HF_TOKEN;
 const MODEL = "intfloat/multilingual-e5-large";
-const API_URL = `https://router.huggingface.co/hf-inference/models/${MODEL}/pipeline/feature-extraction`;
 
-// === RUTA PRINCIPAL ===
 app.post("/embed", async (req, res) => {
-  try {
-    // aceptar texto o inputs
-    let texto = req.body.texto || req.body.inputs;
+    try {
+        const text = req.body.text;
 
-    if (!texto || typeof texto !== "string" || texto.trim().length < 5) {
-      return res.status(400).json({ error: "Texto vacío o demasiado corto" });
+        if (!text || text.trim().length < 10) {
+            return res.status(400).json({ error: "Texto vacío o demasiado corto" });
+        }
+
+        const payload = {
+            model: MODEL,
+            provider: "hf-inference",
+            inputs: `query: ${text}`
+        };
+
+        const response = await fetch(
+            `https://router.huggingface.co/hf-inference/models/${MODEL}/pipeline/feature-extraction`,
+            {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${HF_TOKEN}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            }
+        );
+
+        const result = await response.json();
+
+        if (!Array.isArray(result) || !Array.isArray(result[0])) {
+            console.error("Respuesta inesperada:", result);
+            return res.status(500).json({ error: "Respuesta inesperada de HuggingFace", raw: result });
+        }
+
+        return res.json({ embedding: result[0] });
+
+    } catch (e) {
+        console.error("ERROR /embed:", e);
+        res.status(500).json({ error: "Error procesando embedding" });
     }
-
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${HF_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ inputs: texto }),
-    });
-
-    const data = await response.json();
-
-    // Validar formatos válidos
-    if (data.embeddings) {
-      return res.json({
-        embedding: data.embeddings[0],
-        dim: data.embeddings[0].length,
-      });
-    }
-
-    if (Array.isArray(data) && Array.isArray(data[0])) {
-      // token-level → promedio
-      const tokens = data;
-      const dim = tokens[0].length;
-      let avg = new Array(dim).fill(0);
-
-      for (const t of tokens) {
-        for (let i = 0; i < dim; i++) avg[i] += t[i];
-      }
-
-      avg = avg.map((v) => v / tokens.length);
-
-      return res.json({ embedding: avg, dim });
-    }
-
-    return res.status(500).json({ error: "Formato inesperado", data });
-  } catch (err) {
-    console.error("❌ Error general:", err);
-    res.status(500).json({ error: err.message });
-  }
 });
 
-// === RUTA DE PRUEBA ===
-app.get("/", (req, res) => {
-  res.send("RAG Embedding Service activo");
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor RAG activo en puerto ${PORT}`));
-
+const port = process.env.PORT || 10000;
+app.listen(port, () => console.log(`RAG service listening on port ${port}`));
