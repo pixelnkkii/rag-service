@@ -39,12 +39,23 @@ app.post("/embed", async (req, res) => {
 
         const result = await response.json();
 
-        if (!Array.isArray(result) || !Array.isArray(result[0])) {
-            console.error("Respuesta inesperada:", result);
-            return res.status(500).json({ error: "Respuesta inesperada de HuggingFace", raw: result });
-        }
+// Caso 1: HF devuelve directamente un vector plano
+if (Array.isArray(result) && typeof result[0] === "number") {
+    return res.json({ embedding: result });
+}
 
-        return res.json({ embedding: result[0] });
+// Caso 2: HF devuelve matriz con un vectores
+if (Array.isArray(result) && Array.isArray(result[0])) {
+    return res.json({ embedding: result[0] });
+}
+
+// Caso inesperado
+console.log("Respuesta inesperada:", result);
+return res.status(500).json({ 
+    error: "Respuesta inesperada de HuggingFace",
+    raw: result 
+});
+
 
     } catch (e) {
         console.error("ERROR /embed:", e);
@@ -54,3 +65,4 @@ app.post("/embed", async (req, res) => {
 
 const port = process.env.PORT || 10000;
 app.listen(port, () => console.log(`RAG service listening on port ${port}`));
+
