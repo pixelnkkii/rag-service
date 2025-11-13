@@ -1,3 +1,7 @@
+
+
+
+
 import express from "express";
 import fetch from "node-fetch";
 
@@ -12,8 +16,10 @@ const API_URL = `https://router.huggingface.co/hf-inference/models/${MODEL}/pipe
 // === RUTA PRINCIPAL ===
 app.post("/embed", async (req, res) => {
   try {
-    const { texto } = req.body;
-    if (!texto || texto.trim().length < 5) {
+    // aceptar texto o inputs
+    let texto = req.body.texto || req.body.inputs;
+
+    if (!texto || typeof texto !== "string" || texto.trim().length < 5) {
       return res.status(400).json({ error: "Texto vacío o demasiado corto" });
     }
 
@@ -28,25 +34,30 @@ app.post("/embed", async (req, res) => {
 
     const data = await response.json();
 
-    // Validar formato de respuesta
-    if (!Array.isArray(data)) {
-      console.error("❌ Formato inesperado:", data);
-      return res.status(500).json({ error: "Formato inesperado", data });
+    // Validar formatos válidos
+    if (data.embeddings) {
+      return res.json({
+        embedding: data.embeddings[0],
+        dim: data.embeddings[0].length,
+      });
     }
 
-    // Aplanar si es matriz de embeddings por token
-    let embedding = data;
-    if (Array.isArray(data[0])) {
+    if (Array.isArray(data) && Array.isArray(data[0])) {
+      // token-level → promedio
       const tokens = data;
       const dim = tokens[0].length;
-      embedding = new Array(dim).fill(0);
-      for (const tokenVec of tokens) {
-        for (let i = 0; i < dim; i++) embedding[i] += tokenVec[i];
+      let avg = new Array(dim).fill(0);
+
+      for (const t of tokens) {
+        for (let i = 0; i < dim; i++) avg[i] += t[i];
       }
-      embedding = embedding.map(v => v / tokens.length);
+
+      avg = avg.map((v) => v / tokens.length);
+
+      return res.json({ embedding: avg, dim });
     }
 
-    res.json({ embedding, dim: embedding.length });
+    return res.status(500).json({ error: "Formato inesperado", data });
   } catch (err) {
     console.error("❌ Error general:", err);
     res.status(500).json({ error: err.message });
@@ -55,8 +66,9 @@ app.post("/embed", async (req, res) => {
 
 // === RUTA DE PRUEBA ===
 app.get("/", (req, res) => {
-  res.send("✅ RAG Embedding Service activo (Hugging Face)");
+  res.send("RAG Embedding Service activo");
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor RAG activo en puerto ${PORT}`));
+
